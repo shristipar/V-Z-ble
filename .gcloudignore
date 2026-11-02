@@ -1,0 +1,10 @@
+.venv/
+.claude/
+.git/
+.gitignore
+data/
+reviews/
+__pycache__/
+*.pyc
+deploy.sh
+README.md

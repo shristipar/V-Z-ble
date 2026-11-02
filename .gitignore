@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+# Queued AI reviews hold people's profile text
+reviews/
+data/
+*.pyc
+.DS_Store

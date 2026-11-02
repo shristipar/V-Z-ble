@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>V-Z-ble</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky input rail on the left, report on the right; stacks on phones */
+:root {
+  --bg: #f3f5f4; --panel: #ffffff; --fg: #17201d; --muted: #5d6b66; --line: #d9e0dd;
+  --accent: #1f6f5c; --accent-soft: #dcefe8;
+  --good: #2e8b57; --warn: #c27c0e; --bad: #c0392b;
+  --display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1513; --panel: #17201d; --fg: #e4ece9; --muted: #93a39d; --line: #2a3632;
+    --accent: #5cc4a6; --accent-soft: #1c3a32; --good: #5cc48a; --warn: #e0a640; --bad: #e46a5c; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; display: grid; grid-template-columns: 360px 1fr; gap: 24px; }
+@media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } .rail { position: static !important; max-height: none !important; } }
+header.top { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+a { color: var(--accent); }
+h1 { font: 800 28px/1.1 var(--display); margin: 0; letter-spacing: -0.01em; }
+.tag { color: var(--muted); }
+h2 { font: 700 18px/1.2 var(--display); margin: 0 0 12px; }
+h3 { font: 700 13px/1.2 var(--display); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 8px; }
+.rail { position: sticky; top: 16px; align-self: start; max-height: calc(100vh - 32px); overflow: auto;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+label.f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+input[type=text], input[type=number], input[type=password], select {
+  font: 14px var(--mono); padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); width: 100%; }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.checks label { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; padding: 3px 0; cursor: pointer; }
+.checks input { margin-top: 4px; accent-color: var(--accent); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+button.go { width: 100%; margin-top: 14px; padding: 11px; font: 700 15px var(--display); border: 0; border-radius: 8px;
+  background: var(--accent); color: var(--panel); cursor: pointer; }
+button.go:disabled { opacity: .6; cursor: progress; }
+.hint { font-size: 12px; color: var(--muted); }
+main { min-width: 0; display: grid; gap: 20px; align-content: start; }
+main > .stack:empty { display: none; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; min-width: 0; }
+.summary { display: grid; grid-template-columns: 180px 1fr; gap: 24px; align-items: center; }
+@media (max-width: 560px) { .summary { grid-template-columns: 1fr; justify-items: center; } }
+.ring { position: relative; width: 170px; height: 170px; }
+.ring svg { transform: rotate(-90deg); }
+.ring .num { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.ring .num b { font: 800 46px/1 var(--display); font-variant-numeric: tabular-nums; }
+.ring .num span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.bars { display: grid; gap: 10px; width: 100%; }
+.bar { display: grid; grid-template-columns: 170px 1fr 44px; gap: 10px; align-items: center; font-size: 14px; }
+@media (max-width: 560px) { .bar { grid-template-columns: 110px 1fr 36px; font-size: 13px; } }
+.bar .track { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
+.bar .fill { height: 100%; border-radius: 5px; transition: width .6s ease; }
+.bar .v { font: 500 14px var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.bar .w { color: var(--muted); font-size: 12px; }
+.recs { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.recs li { display: grid; grid-template-columns: 70px 1fr; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.recs .gain { font: 700 18px var(--display); color: var(--accent); }
+.recs .gain small { display: block; font: 400 11px var(--body); color: var(--muted); }
+.recs .cat { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.recs p { margin: 2px 0 0; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.ev { list-style: none; padding: 0; margin: 0; font-size: 14px; }
+.ev li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.ev li span:last-child { font-family: var(--mono); font-size: 13px; text-align: right; }
+.pill { display: inline-block; font: 500 11px var(--mono); padding: 1px 7px; border-radius: 99px; }
+.pill.ok { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.pill.no { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+.heat { display: grid; grid-template-rows: repeat(7, 11px); grid-auto-flow: column; grid-auto-columns: 11px; gap: 3px; margin-top: 8px; overflow-x: auto; }
+.heat i { border-radius: 2px; background: var(--line); }
+.err { color: var(--bad); font-size: 13px; }
+.stack { display: grid; gap: 20px; min-width: 0; }
+.share canvas { width: 100%; height: auto; aspect-ratio: 1200 / 630; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.share-opt { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 12px 0 4px; cursor: pointer; }
+.share-opt input { accent-color: var(--accent); }
+.share-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.share-actions button, .share-btn { font: 500 14px var(--body); padding: 8px 14px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel); color: var(--fg); text-decoration: none; }
+.share-actions button:first-child { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+.share-actions button:hover, .share-btn:hover { border-color: var(--accent); }
+fieldset.goals { border: 0; padding: 0; margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 6px; }
+fieldset.goals legend { font-size: 13px; color: var(--muted); margin-bottom: 6px; padding: 0; }
+.goal-chip { position: relative; cursor: pointer; }
+.goal-chip input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.goal-chip span { display: inline-block; padding: 6px 12px; font-size: 13px; border: 1px solid var(--line); border-radius: 99px; color: var(--fg); }
+.goal-chip input:checked + span { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.goal-chip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+.link-row { display: grid; grid-template-columns: 138px minmax(0, 1fr) 30px; gap: 6px; align-items: center; }
+.link-row select, .link-row input { font-size: 13px; padding: 7px 6px; }
+.link-row select { font-family: var(--body); }
+.link-note { font-size: 12px; color: var(--muted); margin: 3px 0 10px 144px; }
+.link-x { border: 0; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 4px; border-radius: 5px; }
+.link-x:hover { color: var(--bad); background: var(--bg); }
+.add-link { width: 100%; padding: 8px; font: 500 14px var(--body); color: var(--accent); background: transparent;
+  border: 1px dashed var(--line); border-radius: 6px; cursor: pointer; }
+.add-link:hover { border-color: var(--accent); }
+details.more { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 10px; }
+details.more summary { cursor: pointer; font: 700 13px var(--display); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+@media (max-width: 640px) { .review-grid { grid-template-columns: 1fr; } }
+.profile-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.profile-links a { font: 500 12px var(--mono); padding: 3px 9px; border: 1px solid var(--line); border-radius: 99px; text-decoration: none; }
+textarea { font: 13px/1.45 var(--body); padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--fg); width: 100%; resize: vertical; }
+textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.go.alt { background: var(--fg); color: var(--bg); }
+.ai-sec { display: grid; gap: 10px; }
+.ai-sec + .ai-sec { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 8px; }
+.ai-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ai-head h2 { margin: 0; }
+.score10 { font: 700 15px var(--mono); }
+.pc { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 14px; }
+@media (max-width: 640px) { .pc { grid-template-columns: 1fr; } }
+.pc ul { margin: 4px 0 0; padding-left: 18px; }
+.rw { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.rw .from { padding: 8px 12px; color: var(--muted); font-size: 13px; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--bad) 60%, transparent); white-space: pre-wrap; }
+.rw .to { padding: 10px 12px; background: var(--accent-soft); white-space: pre-wrap; display: flex; gap: 10px; justify-content: space-between; align-items: flex-start; }
+.rw .to span { min-width: 0; overflow-wrap: anywhere; }
+.rw .why { padding: 6px 12px 10px; font-size: 13px; color: var(--muted); background: var(--accent-soft); }
+.copy { font: 500 12px var(--mono); border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 5px; padding: 3px 8px; cursor: pointer; flex: none; }
+.sample { background: var(--accent-soft); color: var(--fg); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .bar .fill { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>V-Z-ble</h1>
+    <span class="tag">How your online presence reads to a hiring manager, recruiter or maintainer.</span>
+  </header>
+
+  <form class="rail" id="form">
+    <h2>Your profiles</h2>
+    <fieldset class="goals">
+      <legend>Your goals <span class="hint">(pick one or more)</span></legend>
+      <label class="goal-chip"><input type="checkbox" name="goal" id="goal-job" value="job" checked><span>Landing a new role</span></label>
+      <label class="goal-chip"><input type="checkbox" name="goal" id="goal-oss" value="oss"><span>Open source credibility</span></label>
+      <label class="goal-chip"><input type="checkbox" name="goal" id="goal-thought" value="thought"><span>Thought leadership / speaking</span></label>
+    </fieldset>
+
+    <h3>Links</h3>
+    <div id="links"></div>
+    <button class="add-link" id="addLink" type="button">+ Add profile</button>
+
+    <details class="more">
+      <summary>More about you</summary>
+      <h3>Community</h3>
+      <div class="checks" id="comm"></div>
+    </details>
+
+    <button class="go" id="run" type="submit">Run audit</button>
+    <p class="hint">GitHub allows 60 requests per hour without a token; one audit uses about 5.</p>
+  </form>
+
+  <main>
+    <div id="out" class="stack">
+      <section class="card"><p class="sample">Add your profiles on the left and click Run audit.</p></section>
+    </div>
+
+    <section class="card" id="reviewCard">
+      <h2>AI text review</h2>
+      <p class="hint">Claude critiques the words themselves and suggests rewrites. The LinkedIn import, GitHub README and your post titles fill these in.</p>
+      <div class="review-grid">
+        <label class="f">LinkedIn headline <textarea id="t_headline" rows="2" placeholder="Software Engineer at Acme"></textarea></label>
+        <label class="f">Post titles, one per line <textarea id="t_titles" rows="2" placeholder="Medium, Substack or dev.to titles"></textarea></label>
+        <label class="f">LinkedIn About <textarea id="t_about" rows="5" placeholder="Paste your About section"></textarea></label>
+        <label class="f">LinkedIn Experience <textarea id="t_experience" rows="5" placeholder="Roles and bullets; filled by the LinkedIn import"></textarea></label>
+        <label class="f">GitHub profile README <textarea id="t_readme" rows="4" placeholder="Filled from GitHub if you have one"></textarea></label>
+        <label class="f">Facts Claude may use in rewrites (optional) <textarea id="t_context" rows="4" placeholder="Led migration to Kafka, cut p99 latency 40%, team of 6"></textarea></label>
+      </div>
+      <button class="go alt" id="review" type="button">Review my text</button>
+      <p class="hint" id="aiStatus"></p>
+    </section>
+    <div id="ai" class="stack"></div>
+  </main>
+</div>
+
+<script>
+// ---------- Self-reported checklists: [id, label, points, advice, defaultChecked] ----------
+const CHECKS = {
+  comm: [
+    ["c_talk", "Gave a talk, podcast or workshop in the last 2 years", 25, "Give a lightning talk at a local meetup or internal tech talk, then publish the slides.", false],
+    ["c_meetup", "Active in a meetup, Discord or OSS community", 20, "Pick one community in your niche and show up consistently: answer questions, review PRs.", true],
+    ["c_mentor", "Mentor others (formally or informally)", 15, "Mentor a junior engineer or bootcamp grad. It builds reputation and gives you stories to tell.", false],
+  ],
+};
+
+const WEIGHTS = {
+  job:     { oss: .25, writing: .15, pro: .35, community: .10, consistency: .15 },
+  oss:     { oss: .45, writing: .10, pro: .15, community: .20, consistency: .10 },
+  thought: { oss: .15, writing: .35, pro: .20, community: .20, consistency: .10 },
+};
+const CAT_NAMES = { oss: "Open source", writing: "Writing", pro: "Professional (LinkedIn)", community: "Community", consistency: "Consistency" };
+
+for (const [group, items] of Object.entries(CHECKS)) {
+  document.getElementById(group).innerHTML = items.map(([id, label, , , on]) =>
+    `<label><input type="checkbox" id="${id}" ${on ? "checked" : ""}> <span>${label}</span></label>`).join("");
+}
+
+// ---------- Visitor ID: a random private ID that keeps this browser's LinkedIn import separate ----------
+// The extension reads it from this page (extension/pair.js) to send your imports to the right place.
+const VISITOR_ID = (() => {
+  try {
+    let id = localStorage.getItem("vzb.uid");
+    if (!/^[a-f0-9]{32}$/.test(id || "")) {
+      id = crypto.randomUUID().replace(/-/g, "");
+      localStorage.setItem("vzb.uid", id);
+    }
+    return id;
+  } catch {
+    return crypto.randomUUID().replace(/-/g, "");  // storage blocked: works for this visit only
+  }
+})();
+
+// ---------- Goals: one or more; weights are the average of the selected goals' weights ----------
+const GOALS_KEY = "vzb.goals";
+const goalBoxes = () => [...document.querySelectorAll("input[name=goal]")];
+const selectedGoals = () => goalBoxes().filter(b => b.checked).map(b => b.value);
+
+function blendedWeights() {
+  const goals = selectedGoals().length ? selectedGoals() : ["job"];
+  return Object.fromEntries(Object.keys(CAT_NAMES).map(cat =>
+    [cat, goals.reduce((s, g) => s + WEIGHTS[g][cat], 0) / goals.length]));
+}
+
+try {
+  const saved = JSON.parse(localStorage.getItem(GOALS_KEY));
+  if (Array.isArray(saved) && saved.length) goalBoxes().forEach(b => { b.checked = saved.includes(b.value); });
+} catch { /* storage blocked; keep the default */ }
+
+document.querySelector("fieldset.goals").addEventListener("change", e => {
+  // Keep at least one goal selected.
+  if (!selectedGoals().length) e.target.checked = true;
+  try { localStorage.setItem(GOALS_KEY, JSON.stringify(selectedGoals())); } catch { /* not saved; fine */ }
+  run();
+});
+
+// ---------- Profile links: one row per platform, each platform at most once ----------
+// handle(raw) turns whatever was pasted (a URL, @name, plain name) into the handle the fetcher
+// needs; url(h) builds the public profile link.
+const PLATFORMS = {
+  github:        { name: "GitHub", placeholder: "octocat", note: "Fetched live",
+                   handle: s => s.replace(/^(https?:\/\/)?(www\.)?github\.com\//i, "").split(/[/?#]/)[0].replace(/^@/, ""),
+                   url: h => `https://github.com/${h}` },
+  linkedin:      { name: "LinkedIn", placeholder: "in/your-name", note: "Read by the browser extension. Open your profile and click \"Send to V-Z-ble\".",
+                   handle: s => (s.match(/in\/([^/?#]+)/) || [, s.replace(/^@/, "")])[1],
+                   url: h => `https://www.linkedin.com/in/${h}/` },
+  medium:        { name: "Medium", placeholder: "@you", note: "Fetched live",
+                   handle: s => s.replace(/^(https?:\/\/)?(www\.)?medium\.com\//i, "").replace(/^@/, "").split(/[/?#]/)[0],
+                   url: h => `https://medium.com/@${h}` },
+  substack:      { name: "Substack", placeholder: "you.substack.com", note: "Fetched live",
+                   handle: s => s.replace(/^https?:\/\//i, "").replace(/\/.*$/, ""),
+                   url: h => `https://${h.includes(".") ? h : h + ".substack.com"}` },
+  devto:         { name: "dev.to", placeholder: "your-name", note: "Fetched live",
+                   handle: s => s.replace(/^(https?:\/\/)?dev\.to\//i, "").replace(/^@/, "").split(/[/?#]/)[0],
+                   url: h => `https://dev.to/${h}` },
+  stackoverflow: { name: "Stack Overflow", placeholder: "user ID, like 22656", note: "Fetched live",
+                   handle: s => (s.match(/users\/(\d+)/) || s.match(/^(\d+)$/) || [, ""])[1],
+                   url: h => `https://stackoverflow.com/users/${h}` },
+  youtube:       { name: "YouTube", placeholder: "@channel", note: "Shown as a link",
+                   handle: s => s.replace(/^(https?:\/\/)?(www\.)?youtube\.com\//i, "").replace(/^@/, "").split(/[/?#]/)[0],
+                   url: h => `https://www.youtube.com/@${h}` },
+  x:             { name: "X (Twitter)", placeholder: "@you", note: "Shown as a link",
+                   handle: s => s.replace(/^(https?:\/\/)?(www\.)?(x|twitter)\.com\//i, "").replace(/^@/, "").split(/[/?#]/)[0],
+                   url: h => `https://x.com/${h}` },
+  site:          { name: "Website", placeholder: "yourname.dev", note: "Shown as a link",
+                   handle: s => s.replace(/^https?:\/\//i, "").replace(/\/$/, ""),
+                   url: h => `https://${h}` },
+};
+const LINKS_KEY = "vzb.links";
+const linkNotes = {};  // live notes per platform, e.g. the LinkedIn import status
+
+function savedLinks() {
+  try {
+    const rows = JSON.parse(localStorage.getItem(LINKS_KEY));
+    if (Array.isArray(rows) && rows.length) return rows.filter(r => PLATFORMS[r.kind]);
+  } catch { /* storage blocked; use defaults */ }
+  return [{ kind: "github", value: "" }, { kind: "linkedin", value: "" }, { kind: "medium", value: "" }];
+}
+function saveLinks() {
+  try { localStorage.setItem(LINKS_KEY, JSON.stringify(readLinks())); } catch { /* not saved; fine */ }
+}
+function readLinks() {
+  return [...document.querySelectorAll(".link-row")].map(r => ({ kind: r.querySelector("select").value, value: r.querySelector("input").value }));
+}
+// The cleaned handle for a platform, or "" if it isn't in the list.
+function handle(kind) {
+  const row = readLinks().find(r => r.kind === kind);
+  return row && row.value.trim() ? PLATFORMS[kind].handle(row.value.trim()) : "";
+}
+
+function renderLinks(rows) {
+  const used = new Set(rows.map(r => r.kind));
+  document.getElementById("links").innerHTML = rows.map((r, i) => `
+    <div class="link-row" data-i="${i}">
+      <select id="link-kind-${i}" aria-label="Platform">${Object.entries(PLATFORMS).map(([k, p]) =>
+        `<option value="${k}" ${k === r.kind ? "selected" : ""} ${used.has(k) && k !== r.kind ? "disabled" : ""}>${p.name}</option>`).join("")}</select>
+      <input type="text" id="link-val-${i}" value="${esc(r.value)}" placeholder="${esc(PLATFORMS[r.kind].placeholder)}" aria-label="${esc(PLATFORMS[r.kind].name)} handle" autocomplete="off">
+      <button type="button" class="link-x" aria-label="Remove ${esc(PLATFORMS[r.kind].name)}">×</button>
+    </div>
+    <p class="link-note">${esc(linkNotes[r.kind] || PLATFORMS[r.kind].note)}</p>`).join("");
+  document.getElementById("addLink").hidden = used.size === Object.keys(PLATFORMS).length;
+}
+function updateLinks(change) {
+  const rows = readLinks();
+  change(rows);
+  renderLinks(rows);
+  saveLinks();
+}
+
+document.getElementById("links").addEventListener("change", e => {
+  if (e.target.tagName === "SELECT") updateLinks(() => {});  // re-render so other dropdowns grey out this platform
+  else saveLinks();
+});
+document.getElementById("links").addEventListener("input", saveLinks);
+document.getElementById("links").addEventListener("click", e => {
+  const row = e.target.closest(".link-x") && e.target.closest(".link-row");
+  if (row) updateLinks(rows => rows.splice(+row.dataset.i, 1));
+});
+document.getElementById("addLink").addEventListener("click", () => updateLinks(rows => {
+  const next = Object.keys(PLATFORMS).find(k => !rows.some(r => r.kind === k));
+  if (next) rows.push({ kind: next, value: "" });
+}));
+
+// ---------- Fetching ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const DAY = 864e5;
+const logScale = (x, full) => Math.min(1, Math.log10(x + 1) / Math.log10(full + 1));
+
+async function getJSON(url, headers = {}) {
+  const r = await fetch(url, { headers });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`${new URL(url).host} returned ${r.status}${r.status === 403 ? " (hourly rate limit reached, try again later)" : ""}`);
+  return r.json();
+}
+
+async function fetchGitHub(user) {
+  const h = { Accept: "application/vnd.github+json" };
+  const api = "https://api.github.com";
+  const [profile, repos, events, readme] = await Promise.all([
+    getJSON(`${api}/users/${user}`, h),
+    getJSON(`${api}/users/${user}/repos?per_page=100&sort=pushed`, h),
+    getJSON(`${api}/users/${user}/events/public?per_page=100`, h),
+    getJSON(`${api}/repos/${user}/${user}`, h),
+  ]);
+  if (!profile) throw new Error(`GitHub user "${user}" not found`);
+  let readmeText = "";
+  if (readme) {
+    const r = await fetch(`${api}/repos/${user}/${user}/readme`, { headers: { ...h, Accept: "application/vnd.github.raw" } });
+    if (r.ok) readmeText = await r.text();
+  }
+  return { profile, repos: repos || [], events: events || [], hasReadme: !!readme, readmeText };
+}
+
+async function fetchDevto(user) {
+  const arts = await getJSON(`https://dev.to/api/articles?username=${encodeURIComponent(user)}&per_page=100`);
+  return arts || [];
+}
+
+// Medium and Substack feeds have no CORS headers, so server.py fetches them.
+async function fetchFeed(source, user) {
+  const r = await fetch(`/api/${source}?user=${encodeURIComponent(user)}`);
+  const data = await r.json().catch(() => ({ error: `Server returned ${r.status}. Is server.py running?` }));
+  if (!r.ok) throw new Error(data.error);
+  return data;  // { posts, name, photo }
+}
+
+async function fetchSO(id) {
+  const d = await getJSON(`https://api.stackexchange.com/2.3/users/${encodeURIComponent(id)}?site=stackoverflow`);
+  return d?.items?.[0] || null;
+}
+
+// ---------- Scoring. Every check = { label, pts, got (0..1), advice, evidence } ----------
+function scoreOSS(gh) {
+  if (!gh) return [{ label: "GitHub profile", pts: 100, got: 0, advice: "Add your GitHub username. For engineers it is the most-checked profile after LinkedIn." }];
+  const p = gh.profile, own = gh.repos.filter(r => !r.fork);
+  const stars = own.reduce((s, r) => s + r.stargazers_count, 0);
+  const described = own.length ? own.filter(r => r.description).length / own.length : 0;
+  const cutoff = Date.now() - 90 * DAY;
+  const recent = gh.events.filter(e => Date.parse(e.created_at) > cutoff);
+  const activeDays = new Set(recent.map(e => e.created_at.slice(0, 10))).size;
+  const externalPRs = recent.filter(e => e.type === "PullRequestEvent" && e.payload?.action === "opened"
+    && !e.repo.name.toLowerCase().startsWith(p.login.toLowerCase() + "/")).length;
+  const fields = [p.name, p.bio, p.blog, p.location || p.company].filter(Boolean).length;
+  return [
+    { label: "Profile fields (name, bio, link, location)", pts: 12, got: fields / 4, ev: `${fields}/4`,
+      advice: "Fill in your GitHub name, bio, website link and location. It takes two minutes and is the first thing visitors see." },
+    { label: "Profile README", pts: 10, got: gh.hasReadme ? 1 : 0, ev: gh.hasReadme ? "yes" : "no",
+      advice: `Create a ${p.login}/${p.login} repo with a README: who you are, what you work on, links to your best projects.` },
+    { label: "Followers", pts: 10, got: logScale(p.followers, 500), ev: p.followers.toLocaleString(),
+      advice: "Followers come from visible work. Share your projects where your niche hangs out." },
+    { label: "Stars on original repos", pts: 18, got: logScale(stars, 1000), ev: stars.toLocaleString(),
+      advice: "Build one small tool that solves a real problem, write a strong README with a GIF, and share it." },
+    { label: "Repos have descriptions", pts: 10, got: own.length >= 3 ? described : described * own.length / 3, ev: `${Math.round(described * 100)}% of ${own.length}`,
+      advice: "Give every public repo a one-line description, and pin your 6 best. Archive or hide abandoned experiments." },
+    { label: "Active days, last 90", pts: 22, got: Math.min(1, activeDays / 30), ev: `${activeDays} days`,
+      advice: "Aim for public activity a couple of times a week. Consistency over 3 months beats bursts." },
+    { label: "PRs opened to others' repos, last 90 days", pts: 18, got: Math.min(1, externalPRs / 5), ev: externalPRs,
+      advice: "Contribute to projects you already use: fix docs, triage issues, pick up \"good first issue\" tickets. External PRs show you can work in someone else's codebase." },
+  ];
+}
+
+function scoreWriting(devto, medium, substack) {
+  const yearAgo = Date.now() - 365 * DAY;
+  const d12 = devto.filter(a => Date.parse(a.published_at) > yearAgo);
+  const m12 = medium.filter(p => p.published > yearAgo);
+  const s12 = substack.filter(p => p.published > yearAgo);
+  const total12 = d12.length + m12.length + s12.length;
+  const newest = dates => dates.length ? (Date.now() - Math.max(...dates)) / DAY : Infinity;
+  const last = Math.min(newest(devto.map(a => Date.parse(a.published_at))), newest(medium.map(p => p.published)),
+    newest(substack.map(p => p.published)));
+  const recency = last < 30 ? 1 : last < 90 ? .6 : last < 365 ? .2 : 0;
+  // Medium's feed only lists the latest 10 posts, so 10 in a year may mean more.
+  const mediumCount = m12.length === 10 ? "10+" : m12.length;
+  // Engagement (claps, reactions) isn't scored: Medium's feed doesn't include claps.
+  return [
+    { label: "Posts in the last 12 months", pts: 65, got: Math.min(1, total12 / 12),
+      ev: `${total12}${m12.length === 10 ? "+" : ""} (Medium ${mediumCount}, Substack ${s12.length}, dev.to ${d12.length})`,
+      advice: "Publish one post a month. Write up a bug you fixed, a design decision, or a tool you'd recommend. Short and specific beats long and generic." },
+    { label: "Recency", pts: 35, got: recency, ev: isFinite(last) ? `${Math.round(last)} days ago` : "never",
+      advice: "Your last post is getting old. A short post this week resets the clock." },
+  ];
+}
+
+// LinkedIn is scored only from the extension's import (liProfile); nothing is self-reported.
+let liProfile = null;
+
+function scoreLinkedIn(p) {
+  if (!p) return [{ label: "LinkedIn profile imported", pts: 100, got: 0, ev: "not imported",
+    advice: "Import your LinkedIn profile: install the browser extension, open your profile and click \"Send to V-Z-ble\"." }];
+  const slug = (p.url.match(/\/in\/([^/]+)/) || [])[1] || "";
+  const headline = p.headline || "";
+  // A bare "Title at Company" headline says nothing about what you're good at.
+  const titleOnly = /^[\w\s.\-]{0,40}\s(at|@)\s[^|·,]+$/i.test(headline.trim());
+  const headlineGood = headline.length >= 40 && !titleOnly;
+  const quantified = (p.experience || "").match(/\d+(\.\d+)?\s*(%|x\b|k\b|m\b|ms\b|\+)|\$\s?\d/gi) || [];
+  const recs = p.recommendationsReceived;
+  const days = p.lastPostDays;
+  return [
+    { label: "Profile photo", pts: 8, got: p.hasPhoto ? 1 : 0, ev: p.hasPhoto ? "yes" : "none",
+      advice: "Add a clear, well-lit headshot. Profiles with photos get far more views." },
+    { label: "Headline names your specialty, not just your title", pts: 14, got: headlineGood ? 1 : headline ? .3 : 0,
+      ev: headline ? `${headline.length} chars` : "empty",
+      advice: "Rewrite your headline as specialty + proof, e.g. \"Backend engineer · distributed systems · Kafka & Go\". The AI review suggests options." },
+    { label: "About section (200+ characters)", pts: 14, got: Math.min(1, (p.about || "").length / 200), ev: `${(p.about || "").length} chars`,
+      advice: "Write a 3–5 sentence About: the problems you solve, your stack, one quantified win, what you want next." },
+    { label: "Experience bullets include numbers", pts: 16, got: Math.min(1, quantified.length / 3), ev: `${quantified.length} found`,
+      advice: "Rewrite experience bullets as outcomes with numbers: \"Cut p99 latency 40% for 2M daily users\". The AI review rewrites your weakest ones." },
+    { label: "Skills listed", pts: 8, got: p.skills || p.skillsCount ? 1 : 0,
+      ev: p.skillsCount ? `${p.skillsCount} skills` : p.skills ? `${p.skills.split("\n").filter(Boolean).length} shown` : "none",
+      advice: "Add skills and pin your top 3 so they match the roles you want." },
+    { label: "Featured section", pts: 10, got: p.hasFeatured ? 1 : 0, ev: p.hasFeatured ? "yes" : "none",
+      advice: "Use Featured to show proof: your best repo, a post, a talk recording." },
+    { label: "3+ recommendations received", pts: 10, got: recs == null ? 0 : Math.min(1, recs / 3), ev: recs == null ? "unknown" : recs,
+      advice: "Ask two or three former teammates for a short recommendation about a specific project." },
+    { label: "Posted in the last 30 days", pts: 12, got: days == null ? 0 : days <= 30 ? 1 : days <= 90 ? .4 : 0,
+      ev: days == null ? "no posts found" : `${days} days ago`,
+      advice: "Post once every week or two: a lesson learned, a summary of something you shipped, or a reshare with your own take." },
+    // LinkedIn's default URLs end in a random suffix like -a1b2c3d4.
+    { label: "Custom profile URL", pts: 8, got: slug && !/-[a-z0-9]*\d[a-z0-9]*$/i.test(slug) ? 1 : 0, ev: slug || "unknown",
+      advice: "Claim a clean linkedin.com/in/yourname URL and use it everywhere." },
+  ];
+}
+
+function scoreChecklist(group) {
+  return CHECKS[group].map(([id, label, pts, advice]) => ({ label, pts, got: $(id).checked ? 1 : 0, ev: $(id).checked ? "yes" : "no", advice }));
+}
+
+function scoreCommunity(so) {
+  const rep = so?.reputation || 0;
+  return [
+    { label: "Stack Overflow reputation", pts: 40, got: logScale(rep, 5000), ev: so ? rep.toLocaleString() : "not linked",
+      advice: "Answer two or three Stack Overflow or GitHub Discussions questions a week in your strongest tag." },
+    ...scoreChecklist("comm"),
+  ];
+}
+
+// ---------- Consistency across profiles (handles, names, photos), checked automatically ----------
+// ids: [{ platform, handle, name, hash }] for every profile we could read.
+const PHOTO_MATCH_BITS = 10;  // photo fingerprints this close (of 64 bits) are the same photo
+const hamming = (a, b) => [...(BigInt("0x" + a) ^ BigInt("0x" + b)).toString(2)].filter(c => c === "1").length;
+
+// The biggest group of values that "match", and who's outside it.
+function biggestGroup(items, same) {
+  let best = [];
+  for (const it of items) {
+    const group = items.filter(o => same(it, o));
+    if (group.length > best.length) best = group;
+  }
+  return { group: best, others: items.filter(o => !best.includes(o)) };
+}
+
+function matchCheck(label, pts, items, same, show, advice) {
+  if (items.length < 2) return null;  // nothing to compare
+  const { group, others } = biggestGroup(items, same);
+  const names = list => list.map(i => PLATFORMS[i.platform].name).join(", ");
+  return { label, pts, got: group.length / items.length,
+    ev: others.length ? `${group.length} of ${items.length} match` : `all ${items.length} match`,
+    advice: others.length ? `${advice} Different on ${names(others)}: ${others.map(show).join(", ")}; most use ${show(group[0])}.` : advice };
+}
+
+function scoreIdentity(ids) {
+  const handleKey = h => h.toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Compare first and last name only, ignoring accents, case, middle names and punctuation.
+  const nameKey = n => {
+    const w = n.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
+    return w.length ? `${w[0]} ${w[w.length - 1]}` : "";
+  };
+  return [
+    matchCheck("Same handle across platforms", 15, ids.filter(i => i.handle),
+      (a, b) => handleKey(a.handle) === handleKey(b.handle), i => `${i.handle} (${PLATFORMS[i.platform].name})`,
+      "Use one handle everywhere so people can find you on every platform."),
+    matchCheck("Same name across platforms", 15, ids.filter(i => i.name && nameKey(i.name)),
+      (a, b) => nameKey(a.name) === nameKey(b.name), i => `"${i.name}" (${PLATFORMS[i.platform].name})`,
+      "Use the same display name everywhere so your profiles read as one person."),
+    matchCheck("Same photo across platforms", 20, ids.filter(i => i.hash),
+      (a, b) => hamming(a.hash, b.hash) <= PHOTO_MATCH_BITS, i => PLATFORMS[i.platform].name,
+      "Use one clear photo everywhere so people recognize you across GitHub, LinkedIn and your blog."),
+  ].filter(Boolean);
+}
+
+// Collects handle, display name and photo fingerprint from each profile that was read.
+async function gatherIdentities({ gh, medium, substack, devto, so }) {
+  const author = devto?.[0]?.user;
+  const subHost = handle("substack");
+  const ids = [
+    gh && { platform: "github", handle: gh.profile.login, name: gh.profile.name, photo: gh.profile.avatar_url },
+    liProfile && { platform: "linkedin", handle: (liProfile.url.match(/\/in\/([^/]+)/) || [])[1], name: liProfile.name, hash: liProfile.photoHash },
+    medium && { platform: "medium", handle: handle("medium"), name: medium.name, photo: medium.photo },
+    substack && { platform: "substack", handle: subHost.endsWith(".substack.com") || !subHost.includes(".") ? subHost.split(".")[0] : "", name: substack.name },
+    author && { platform: "devto", handle: author.username, name: author.name, photo: author.profile_image },
+    so && { platform: "stackoverflow", name: so.display_name, photo: so.profile_image },
+    ...["youtube", "x"].filter(k => handle(k)).map(k => ({ platform: k, handle: handle(k) })),
+  ].filter(Boolean);
+  await Promise.all(ids.filter(i => i.photo && !i.hash).map(async i => {
+    try {
+      const r = await fetch(`/api/photo-hash?url=${encodeURIComponent(i.photo)}`);
+      if (r.ok) i.hash = (await r.json()).hash;
+    } catch { /* photo not compared */ }
+  }));
+  return ids;
+}
+
+function scoreConsistency(gh, ids) {
+  const p = gh?.profile;
+  return [
+    { label: "GitHub links to your site or LinkedIn", pts: 15, got: p?.blog ? 1 : 0, ev: p?.blog || "none",
+      advice: "Set the website field on GitHub to your personal site or LinkedIn so profiles point at each other." },
+    { label: "Social handle on GitHub", pts: 10, got: p?.twitter_username ? 1 : 0, ev: p?.twitter_username ? "@" + p.twitter_username : "none",
+      advice: "Add your social accounts to GitHub so readers can follow you beyond your code." },
+    { label: "Personal website or portfolio", pts: 25, got: handle("site") ? 1 : 0, ev: handle("site") || "not added",
+      advice: "Put up a one-page site (GitHub Pages works) linking all your profiles and your best 3 projects, then add it to your links." },
+    ...scoreIdentity(ids),
+  ];
+}
+
+const sum = checks => Math.round(checks.reduce((s, c) => s + c.pts * c.got, 0) / checks.reduce((s, c) => s + c.pts, 0) * 100);
+
+// ---------- Rendering ----------
+const color = v => v >= 70 ? "var(--good)" : v >= 40 ? "var(--warn)" : "var(--bad)";
+
+function render(cats, weights, gh, errors) {
+  const scores = Object.fromEntries(Object.entries(cats).map(([k, c]) => [k, sum(c)]));
+  const overall = Math.round(Object.entries(scores).reduce((s, [k, v]) => s + v * weights[k], 0));
+  const C = 2 * Math.PI * 74;
+  const verdict = overall >= 75 ? "Strong signal" : overall >= 50 ? "Solid, with gaps" : overall >= 30 ? "Hard to find" : "Mostly invisible";
+
+  // Recommendations: rank every unmet check by overall points it could add.
+  const recs = Object.entries(cats).flatMap(([k, checks]) => {
+    const total = checks.reduce((s, c) => s + c.pts, 0);
+    return checks.filter(c => c.got < .95).map(c => ({ cat: k, ...c, gain: (1 - c.got) * c.pts / total * 100 * weights[k] }));
+  }).sort((a, b) => b.gain - a.gain).slice(0, 8);
+
+  const who = gh ? `<a href="${esc(gh.profile.html_url)}" target="_blank" rel="noopener">${esc(gh.profile.name || gh.profile.login)}</a>` : "Your profile";
+  shareData = { overall, verdict, scores, gap: recs[0], name: liProfile?.name || gh?.profile.name || gh?.profile.login || "" };
+
+  $("out").innerHTML = `
+    ${errors.length ? `<section class="card">${errors.map(e => `<p class="err">${esc(e)}</p>`).join("")}</section>` : ""}
+    <section class="card summary">
+      <div class="ring">
+        <svg width="170" height="170" viewBox="0 0 170 170">
+          <circle cx="85" cy="85" r="74" fill="none" stroke="var(--line)" stroke-width="12"/>
+          <circle cx="85" cy="85" r="74" fill="none" stroke="${color(overall)}" stroke-width="12" stroke-linecap="round"
+            stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - overall / 100)}"/>
+        </svg>
+        <div class="num"><b>${overall}</b><span>of 100</span></div>
+      </div>
+      <div>
+        <h2>${who}: ${verdict}</h2>
+        <p class="hint">GitHub, Medium, Substack, dev.to and Stack Overflow are fetched live; LinkedIn comes from the browser extension.</p>
+        ${profileLinks()}
+        <div class="bars">
+          ${Object.entries(scores).map(([k, v]) => `
+            <div class="bar"><span>${CAT_NAMES[k]} <span class="w">×${Math.round(weights[k] * 100) / 100}</span></span>
+              <div class="track"><div class="fill" style="width:${v}%;background:${color(v)}"></div></div>
+              <span class="v">${v}</span></div>`).join("")}
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>What to do next</h2>
+      <ol class="recs">
+        ${recs.map(r => `<li><div class="gain">+${r.gain.toFixed(1)}<small>points</small></div>
+          <div><div class="cat">${CAT_NAMES[r.cat]} · ${esc(r.label)}</div><p>${esc(r.advice)}</p></div></li>`).join("")}
+      </ol>
+    </section>
+
+    <section class="card share">
+      <h2>Share your score</h2>
+      <canvas id="shareCanvas" width="1200" height="630" aria-label="Your V-Z-ble score card"></canvas>
+      <label class="share-opt"><input type="checkbox" id="shareName" ${shareShowName ? "checked" : ""}> Show my name on the card</label>
+      <div class="share-actions">
+        <button type="button" data-share="download">Download image</button>
+        <button type="button" data-share="copy-image">Copy image</button>
+        <button type="button" data-share="copy-text">Copy post text</button>
+        <a class="share-btn" data-share="linkedin" target="_blank" rel="noopener">Post on LinkedIn</a>
+        <a class="share-btn" data-share="x" target="_blank" rel="noopener">Post on X</a>
+      </div>
+      <p class="hint" id="shareStatus">Copy the image first, then paste it into your post: LinkedIn and X don't attach images from links.</p>
+    </section>
+
+    ${gh ? `<section class="card"><h2>GitHub public activity, last 90 days</h2>${heatmap(gh.events)}
+      <p class="hint">GitHub's public events API only returns the latest ~300 events, so very active accounts may show fewer days than they really have.</p></section>` : ""}
+
+    <section class="grid2">
+      ${Object.entries(cats).map(([k, checks]) => `
+        <div class="card"><h2>${CAT_NAMES[k]} <span class="pill ${scores[k] >= 50 ? "ok" : "no"}">${scores[k]}</span></h2>
+          <ul class="ev">${checks.map(c => `<li><span>${esc(c.label)}</span><span>${esc(c.ev)}</span></li>`).join("")}</ul></div>`).join("")}
+    </section>`;
+  updateShare();
+}
+
+// ---------- Shareable score card ----------
+// The app's public address (PUBLIC_URL on the server); it then appears on the card and in posts.
+let SHARE_URL = "";
+const SHARE_NAME_KEY = "vzb.shareName";
+let shareData = null;
+let shareShowName = (() => { try { return localStorage.getItem(SHARE_NAME_KEY) !== "0"; } catch { return true; } })();
+
+// The image always uses the app's dark palette, so it looks the same wherever it's posted.
+const CARD = { bg: "#0f1513", panel: "#17201d", fg: "#e4ece9", muted: "#93a39d", line: "#2a3632",
+  accent: "#5cc4a6", good: "#5cc48a", warn: "#e0a640", bad: "#e46a5c" };
+const cardColor = v => v >= 70 ? CARD.good : v >= 40 ? CARD.warn : CARD.bad;
+
+function wrapText(ctx, text, maxWidth, maxLines) {
+  const lines = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word; } else line = test;
+  }
+  lines.push(line);
+  if (lines.length > maxLines) {
+    lines.length = maxLines;
+    lines[maxLines - 1] = lines[maxLines - 1].replace(/\s+\S*$/, "") + "…";
+  }
+  return lines;
+}
+
+function drawShareCard(canvas, d, showName) {
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const display = '"Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif';
+  const body = '"IBM Plex Sans", system-ui, sans-serif';
+  const mono = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
+
+  ctx.fillStyle = CARD.bg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = CARD.accent; ctx.fillRect(0, 0, W, 8);
+
+  // Score ring on the left.
+  const cx = 250, cy = 330, r = 150;
+  ctx.lineWidth = 26; ctx.lineCap = "round";
+  ctx.strokeStyle = CARD.line; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
+  ctx.strokeStyle = cardColor(d.overall);
+  ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * d.overall / 100); ctx.stroke();
+  ctx.textAlign = "center"; ctx.fillStyle = CARD.fg;
+  ctx.font = `800 120px ${display}`; ctx.fillText(String(d.overall), cx, cy + 38);
+  ctx.font = `500 22px ${mono}`; ctx.fillStyle = CARD.muted; ctx.fillText("OF 100", cx, cy + 82);
+
+  // Title, verdict and category bars on the right.
+  const x = 480, trackX = x + 190, trackW = W - 60 - 70 - trackX;  // value column is the last 70px
+  ctx.textAlign = "left";
+  ctx.font = `600 22px ${mono}`; ctx.fillStyle = CARD.accent; ctx.fillText("V-Z-BLE SCORE", x, 92);
+  const name = showName && d.name ? d.name.split(" ")[0] : "";
+  ctx.font = `800 46px ${display}`; ctx.fillStyle = CARD.fg;
+  ctx.fillText(name ? `${name}'s online presence` : "My online presence", x, 150);
+  ctx.font = `500 30px ${body}`; ctx.fillStyle = cardColor(d.overall); ctx.fillText(d.verdict, x, 196);
+
+  Object.entries(d.scores).forEach(([k, v], i) => {
+    const y = 250 + i * 50;
+    ctx.font = `400 22px ${body}`; ctx.fillStyle = CARD.muted;
+    ctx.fillText(CAT_NAMES[k].replace(" (LinkedIn)", ""), x, y + 8);
+    ctx.fillStyle = CARD.line; ctx.fillRect(trackX, y - 6, trackW, 14);
+    ctx.fillStyle = cardColor(v); ctx.fillRect(trackX, y - 6, trackW * v / 100, 14);
+    ctx.font = `500 22px ${mono}`; ctx.fillStyle = CARD.fg; ctx.textAlign = "right";
+    ctx.fillText(String(v), W - 60, y + 8); ctx.textAlign = "left";
+  });
+
+  // Biggest gap along the bottom.
+  ctx.fillStyle = CARD.panel; ctx.fillRect(0, H - 110, W, 110);
+  if (d.gap) {
+    ctx.font = `600 18px ${mono}`; ctx.fillStyle = CARD.accent; ctx.fillText("BIGGEST GAP", 60, H - 66);
+    ctx.font = `500 26px ${body}`; ctx.fillStyle = CARD.fg;
+    ctx.fillText(wrapText(ctx, d.gap.label, 720, 1)[0], 60, H - 32);
+  }
+  ctx.textAlign = "right"; ctx.font = `500 22px ${mono}`; ctx.fillStyle = CARD.muted;
+  ctx.fillText(SHARE_URL ? SHARE_URL.replace(/^https?:\/\//, "") : "Check yours with V-Z-ble", W - 60, H - 46);
+  ctx.textAlign = "left";
+}
+
+function shareText(d) {
+  const best = Object.entries(d.scores).sort((a, b) => b[1] - a[1])[0];
+  return `My V-Z-ble score is ${d.overall}/100 (${d.verdict.toLowerCase()}). `
+    + `Strongest: ${CAT_NAMES[best[0]].replace(" (LinkedIn)", "")} at ${best[1]}. `
+    + (d.gap ? `Biggest gap: ${d.gap.label}. ` : "")
+    + (SHARE_URL ? `Check yours: ${SHARE_URL}` : "#developers #careers");
+}
+
+async function updateShare() {
+  const canvas = $("shareCanvas");
+  if (!canvas || !shareData) return;
+  try { await document.fonts.ready; } catch { /* draw with fallback fonts */ }
+  drawShareCard(canvas, shareData, shareShowName);
+  const text = encodeURIComponent(shareText(shareData));
+  document.querySelector("[data-share=linkedin]").href = `https://www.linkedin.com/feed/?shareActive=true&text=${text}`;
+  document.querySelector("[data-share=x]").href = `https://x.com/intent/post?text=${text}`;
+}
+
+$("out").addEventListener("change", e => {
+  if (e.target.id !== "shareName") return;
+  shareShowName = e.target.checked;
+  try { localStorage.setItem(SHARE_NAME_KEY, shareShowName ? "1" : "0"); } catch { /* not saved; fine */ }
+  updateShare();
+});
+
+$("out").addEventListener("click", async e => {
+  const action = e.target.closest("[data-share]")?.dataset.share;
+  if (!action || !shareData) return;
+  const status = $("shareStatus");
+  const canvas = $("shareCanvas");
+  const png = () => new Promise(res => canvas.toBlob(res, "image/png"));
+  if (action === "download") {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(await png());
+    a.download = `v-z-ble-score-${shareData.overall}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    status.textContent = "Image downloaded.";
+  } else if (action === "copy-image") {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": png() })]);
+      status.textContent = "Image copied. Paste it into your post.";
+    } catch {
+      status.textContent = "This browser can't copy images. Use Download image instead.";
+    }
+  } else if (action === "copy-text") {
+    try {
+      await navigator.clipboard.writeText(shareText(shareData));
+      status.textContent = "Post text copied.";
+    } catch {
+      status.textContent = shareText(shareData);
+    }
+  }
+});
+
+// Every link in the list, including link-only ones like YouTube, as chips under the score.
+function profileLinks() {
+  const chips = readLinks().filter(r => r.value.trim()).map(r => {
+    const p = PLATFORMS[r.kind], h = p.handle(r.value.trim());
+    return h ? `<a href="${esc(p.url(h))}" target="_blank" rel="noopener">${esc(p.name)}</a>` : "";
+  }).join("");
+  return chips ? `<div class="profile-links">${chips}</div>` : "";
+}
+
+function heatmap(events) {
+  const counts = {};
+  events.forEach(e => { const d = e.created_at.slice(0, 10); counts[d] = (counts[d] || 0) + 1; });
+  const start = new Date(Date.now() - 90 * DAY); start.setUTCDate(start.getUTCDate() - start.getUTCDay());
+  const cells = [];
+  for (let t = start.getTime(); t <= Date.now(); t += DAY) {
+    const d = new Date(t).toISOString().slice(0, 10), n = counts[d] || 0;
+    const a = n ? Math.min(1, .25 + n / 10) : 0;
+    cells.push(`<i title="${d}: ${n} events" style="${n ? `background:color-mix(in srgb, var(--accent) ${Math.round(a * 100)}%, var(--line))` : ""}"></i>`);
+  }
+  return `<div class="heat">${cells.join("")}</div>`;
+}
+
+// ---------- Run ----------
+async function run(e) {
+  e?.preventDefault();
+  const btn = $("run"); btn.disabled = true; btn.textContent = "Auditing…";
+  const errors = [];
+  const safe = (p, label) => p.catch(err => { errors.push(`${label}: ${err.message}`); return null; });
+  const ghUser = handle("github"), devUser = handle("devto"), soId = handle("stackoverflow");
+  const mediumUser = handle("medium"), substackPub = handle("substack");
+  if (readLinks().some(r => r.kind === "stackoverflow" && r.value.trim()) && !soId)
+    errors.push("Stack Overflow: enter your numeric user ID or your profile link (stackoverflow.com/users/12345/…).");
+  const [gh, devto, so, medium, substack] = await Promise.all([
+    ghUser ? safe(fetchGitHub(ghUser), "GitHub") : null,
+    devUser ? safe(fetchDevto(devUser), "dev.to") : [],
+    soId ? safe(fetchSO(soId), "Stack Overflow") : null,
+    mediumUser ? safe(fetchFeed("medium", mediumUser), "Medium") : null,
+    substackPub ? safe(fetchFeed("substack", substackPub), "Substack") : null,
+  ]);
+  const cats = {
+    oss: scoreOSS(gh),
+    writing: scoreWriting(devto || [], medium?.posts || [], substack?.posts || []),
+    pro: scoreLinkedIn(liProfile),
+    community: scoreCommunity(so),
+    consistency: scoreConsistency(gh, await gatherIdentities({ gh, medium, substack, devto, so })),
+  };
+  render(cats, blendedWeights(), gh, errors);
+  // Prefill the AI review with fetched text, without overwriting anything the user typed.
+  autofill("t_readme", gh?.readmeText || "");
+  // Newest posts first across Medium, Substack and dev.to.
+  const titles = [
+    ...[...(medium?.posts || []), ...(substack?.posts || [])].map(p => ({ title: p.title, at: p.published })),
+    ...(devto || []).map(a => ({ title: a.title, at: Date.parse(a.published_at) })),
+  ].sort((a, b) => b.at - a.at).slice(0, 10);
+  autofill("t_titles", titles.map(t => t.title.replace(/\s+/g, " ").trim()).join("\n"));
+  btn.disabled = false; btn.textContent = "Run audit";
+}
+
+function autofill(id, text) {
+  const el = $(id);
+  if (!el.value.trim() || el.dataset.auto === "1") { el.value = text; el.dataset.auto = text ? "1" : ""; }
+}
+["t_readme", "t_titles"].forEach(id => $(id).addEventListener("input", () => { $(id).dataset.auto = ""; }));
+
+// ---------- AI review (server.py proxies to Claude) ----------
+const SECTION_NAMES = { headline: "LinkedIn headline", about: "LinkedIn About", experience: "LinkedIn Experience", readme: "GitHub profile README", post_titles: "Post titles" };
+
+async function aiReview() {
+  const btn = $("review"), box = $("ai");
+  btn.disabled = true; btn.textContent = "Reviewing…";
+  box.innerHTML = `<section class="card"><p class="hint">Claude is reading your text…</p></section>`;
+  try {
+    const r = await fetch("/api/review", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-VZB-User": VISITOR_ID },
+      body: JSON.stringify({
+        goals: selectedGoals(), headline: $("t_headline").value, about: $("t_about").value, experience: $("t_experience").value,
+        readme: $("t_readme").value, titles: $("t_titles").value, context: $("t_context").value,
+      }),
+    });
+    let data = await r.json().catch(() => ({ error: `Server returned ${r.status}. Is server.py running?` }));
+    if (!r.ok) throw new Error(data.error);
+    if (data.queued) data = await waitForAgent(data.id);
+    renderReview(data);
+    box.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (err) {
+    box.innerHTML = `<section class="card"><p class="err">${esc(err.message)}</p></section>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "Review my text";
+  }
+}
+
+// No API key: the server queued the request for a Claude Code agent. Poll until it answers.
+async function waitForAgent(id) {
+  $("review").textContent = "Waiting for the agent…";
+  $("ai").innerHTML = `<section class="card"><h2>Review queued</h2>
+    <p>Request <code>${esc(id)}</code> is saved in <code>reviews/</code>. In your Claude Code session, ask:
+    <b>"run the queued V-Z-ble review"</b>. This page shows the result as soon as it's written.</p></section>`;
+  for (;;) {
+    await new Promise(res => setTimeout(res, 4000));
+    const r = await fetch(`/api/review/${id}`);
+    const data = await r.json().catch(() => ({ error: `Server returned ${r.status}.` }));
+    if (r.status === 202) continue;
+    if (!r.ok) throw new Error(data.error);
+    return data;
+  }
+}
+
+function renderReview(rv) {
+  const list = (title, items) => items.length ? `<div><b>${title}</b><ul>${items.map(i => `<li>${esc(i)}</li>`).join("")}</ul></div>` : "";
+  $("ai").innerHTML = `<section class="card">
+    <h2>AI review</h2><p>${esc(rv.summary)}</p>
+    ${rv.sections.map(s => {
+      const pct = Math.max(0, Math.min(10, s.score)) * 10;
+      return `<div class="ai-sec">
+        <div class="ai-head"><h2>${SECTION_NAMES[s.section] || esc(s.section)}</h2>
+          <span class="score10" style="color:${color(pct)}">${esc(s.score)}/10</span></div>
+        <p style="margin:0">${esc(s.verdict)}</p>
+        <div class="pc">${list("Working", s.strengths)}${list("Fix", s.problems)}</div>
+        ${s.rewrites.map(w => `<div class="rw">
+          ${w.original ? `<div class="from">${esc(w.original)}</div>` : ""}
+          <div class="to"><span>${esc(w.suggestion)}</span><button type="button" class="copy" data-text="${esc(w.suggestion)}">Copy</button></div>
+          <div class="why">${esc(w.why)}</div></div>`).join("")}
+      </div>`;
+    }).join("")}
+    <p class="hint">Text in [brackets] is a placeholder. Replace it with your real numbers before using a rewrite.</p>
+  </section>`;
+}
+
+$("ai").addEventListener("click", async e => {
+  const b = e.target.closest(".copy"); if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.text); b.textContent = "Copied"; }
+  catch { b.textContent = "Select it"; }
+  setTimeout(() => { b.textContent = "Copy"; }, 1500);
+});
+$("review").addEventListener("click", aiReview);
+
+fetch("/api/status").then(r => r.json()).then(s => {
+  $("aiStatus").textContent = !s.ai
+    ? (s.hosted ? "The AI review isn't turned on for this site yet." : "No API key set: reviews are queued for a Claude Code agent to answer.")
+    : `Uses ${s.model}. Your text is sent to the Anthropic API.` + (s.reviewsPerDay ? ` ${s.reviewsPerDay} reviews per day.` : "");
+  if (s.publicUrl) { SHARE_URL = s.publicUrl; updateShare(); }
+}).catch(() => { $("aiStatus").textContent = "AI review needs server.py running (see README)."; });
+
+// ---------- LinkedIn import (from the browser extension, via server.py) ----------
+let liImportedAt = 0;
+
+function applyLinkedIn(p) {
+  liProfile = p;
+  autofill("t_headline", p.headline || "");
+  autofill("t_about", p.about || "");
+  autofill("t_experience", p.experience || "");
+  const when = new Date(p.importedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  linkNotes.linkedin = `Imported ${p.name || "profile"} on ${when}. To update, click "Send to V-Z-ble" on your profile again.`
+    + (p.looksLikeOwnProfile === false ? " This may not be your own profile." : "")
+    + (p.latestExtensionVersion && p.extensionVersion !== p.latestExtensionVersion
+      ? ` This import came from an outdated extension (${p.extensionVersion || "before 0.3.0"}; current is ${p.latestExtensionVersion}): click the reload icon on the extension in chrome://extensions, reload LinkedIn, and send again.` : "")
+    + (p.sectionsFound && !p.sectionsFound.includes("Experience")
+      ? " Experience didn't load: scroll to the bottom of your profile, then send again." : "");
+  // Show the note on the LinkedIn row, adding the row (with the imported profile link) if needed.
+  updateLinks(rows => {
+    const slug = (p.url.match(/\/in\/([^/]+)/) || [])[1] || "";
+    const row = rows.find(r => r.kind === "linkedin");
+    if (!row) rows.push({ kind: "linkedin", value: slug ? `in/${slug}` : "" });
+    else if (!row.value.trim() && slug) row.value = `in/${slug}`;
+  });
+}
+
+// The server only holds an import briefly (hosted servers have no disk and restart often), so the
+// page keeps its own copy in this browser and uses the server's only when it's newer.
+const LI_CACHE_KEY = "vzb.linkedin";
+
+function loadCachedLinkedIn() {
+  try {
+    const p = JSON.parse(localStorage.getItem(LI_CACHE_KEY));
+    if (p && p.importedAt) { liImportedAt = p.importedAt; applyLinkedIn(p); }
+  } catch { /* nothing cached */ }
+}
+
+async function checkLinkedIn() {
+  try {
+    const r = await fetch("/api/linkedin", { headers: { "X-VZB-User": VISITOR_ID } });
+    if (!r.ok) return;
+    const p = await r.json();
+    if (p.importedAt > liImportedAt) {
+      const first = liImportedAt === 0;
+      liImportedAt = p.importedAt;
+      try { localStorage.setItem(LI_CACHE_KEY, JSON.stringify(p)); } catch { /* kept for this visit only */ }
+      applyLinkedIn(p);
+      if (!first) run();
+    }
+  } catch { /* server not running; the audit still works */ }
+}
+["t_headline", "t_about", "t_experience"].forEach(id => $(id).addEventListener("input", () => { $(id).dataset.auto = ""; }));
+setInterval(() => { if (!document.hidden) checkLinkedIn(); }, 4000);
+
+$("form").addEventListener("submit", run);
+renderLinks(savedLinks());
+loadCachedLinkedIn();
+checkLinkedIn().then(run);
+</script>
+</body>
+</html>

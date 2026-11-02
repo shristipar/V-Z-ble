@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "V-Z-ble LinkedIn import",
+  "version": "0.7.0",
+  "description": "Sends your own LinkedIn profile to your V-Z-ble audit.",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["extract.js", "content.js"]
+    },
+    {
+      "matches": ["http://localhost:8765/*", "https://v-z-ble-qukdgtc2ca-uc.a.run.app/*"],
+      "js": ["pair.js"]
+    }
+  ],
+  "background": { "service_worker": "background.js" },
+  "host_permissions": ["http://localhost:8765/*", "https://v-z-ble-qukdgtc2ca-uc.a.run.app/*"]
+}

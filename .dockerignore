@@ -1,0 +1,8 @@
+.venv/
+.claude/
+.git/
+data/
+reviews/
+__pycache__/
+*.pyc
+deploy.sh
