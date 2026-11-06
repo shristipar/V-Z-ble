@@ -863,12 +863,10 @@ async function aiReview() {
   }
 }
 
-// No API key: the server queued the request for a Claude Code agent. Poll until it answers.
 async function waitForAgent(id) {
   $("review").textContent = "Waiting for the agent…";
   $("ai").innerHTML = `<section class="card"><h2>Review queued</h2>
-    <p>Request <code>${esc(id)}</code> is saved in <code>reviews/</code>. In your Claude Code session, ask:
-    <b>"run the queued V-Z-ble review"</b>. This page shows the result as soon as it's written.</p></section>`;
+    <p>Request <code>${esc(id)}</code> is saved in <code>reviews/</code></section>`;
   for (;;) {
     await new Promise(res => setTimeout(res, 4000));
     const r = await fetch(`/api/review/${id}`);
@@ -910,7 +908,7 @@ $("review").addEventListener("click", aiReview);
 
 fetch("/api/status").then(r => r.json()).then(s => {
   $("aiStatus").textContent = !s.ai
-    ? (s.hosted ? "The AI review isn't turned on for this site yet." : "No API key set: reviews are queued for a Claude Code agent to answer.")
+    ? (s.hosted ? "The AI review isn't turned on for this site yet." : "No API key set: reviews are queued.")
     : `Uses ${s.model}. Your text is sent to the Anthropic API.` + (s.reviewsPerDay ? ` ${s.reviewsPerDay} reviews per day.` : "");
   if (s.publicUrl) { SHARE_URL = s.publicUrl; updateShare(); }
 }).catch(() => { $("aiStatus").textContent = "AI review needs server.py running (see README)."; });

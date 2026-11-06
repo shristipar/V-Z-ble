@@ -9,7 +9,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ANTHROPIC_API_KEY=sk-ant-... .venv/bin/python server.py
 ```
 
-Then open http://localhost:8765. The API key is optional: without it, AI reviews are handed to a Claude Code agent (below).
+Then open http://localhost:8765.
 
 ## Adding your profiles
 

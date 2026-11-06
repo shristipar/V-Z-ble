@@ -24,6 +24,7 @@ import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
+import zipfile
 from email.utils import parsedate_to_datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -97,6 +98,17 @@ LINKEDIN_FIELDS = {
     "hasActivitySection": bool, "extensionVersion": str,
 }
 EXTENSION_MANIFEST = ROOT / "extension" / "manifest.json"
+EXTENSION_ZIP_PATH = "/v-z-ble-extension.zip"
+
+
+def extension_zip() -> bytes:
+    """The Chrome extension as a download. It unzips into one folder, ready for Load unpacked."""
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for path in sorted(EXTENSION_MANIFEST.parent.rglob("*")):
+            if path.suffix in (".js", ".json", ".png"):
+                z.write(path, f"v-z-ble-extension/{path.relative_to(EXTENSION_MANIFEST.parent)}")
+    return out.getvalue()
 
 
 def linkedin_file(user: str) -> Path:
@@ -107,7 +119,7 @@ def linkedin_file(user: str) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
         LEGACY_LINKEDIN.rename(path)
     return path
-LINKEDIN_COUNTS = ("recommendationsReceived", "lastPostDays", "skillsCount")  # whole numbers, or null if unknown
+LINKEDIN_COUNTS = ("recommendationsReceived", "lastPostDays", "skillsCount", "cutOffCount")  # whole numbers, or null if unknown
 
 
 def save_linkedin(data: dict, user: str) -> tuple[int, dict]:
@@ -202,9 +214,64 @@ def read_feed(url: str, source: str, not_found: str) -> tuple[int, object]:
     }
 
 
+LEETCODE_USER_RE = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
+LEETCODE_QUERY = """query($u: String!) {
+  matchedUser(username: $u) {
+    username
+    profile { realName userAvatar }
+    submitStatsGlobal { acSubmissionNum { difficulty count } }
+    userCalendar { submissionCalendar }
+  }
+  userContestRanking(username: $u) { rating attendedContestsCount }
+}"""
+
+
+def fetch_leetcode(raw: str) -> tuple[int, dict]:
+    """Reads a public LeetCode profile (solved counts, recent practice, contest rating) from the
+    GraphQL endpoint leetcode.com's own profile page uses. It needs no sign-in, but browsers can't
+    call it (no CORS headers), so the server does."""
+    user = re.sub(r"^(https?://)?(www\.)?leetcode\.com/(u/)?", "", raw.strip(), flags=re.I).lstrip("@").split("/")[0]
+    if not LEETCODE_USER_RE.match(user):
+        return 400, {"error": "Enter a LeetCode username or a leetcode.com/u/you link."}
+    req = urllib.request.Request(
+        "https://leetcode.com/graphql",
+        data=json.dumps({"query": LEETCODE_QUERY, "variables": {"u": user}}).encode(),
+        headers={"Content-Type": "application/json", "Referer": "https://leetcode.com", "User-Agent": "Mozilla/5.0 V-Z-ble"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read()).get("data") or {}
+    except urllib.error.HTTPError as e:
+        return 502, {"error": f"LeetCode returned {e.code}."}
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+        return 502, {"error": "Couldn't reach LeetCode. Try again in a moment."}
+    found = data.get("matchedUser")
+    if not found:
+        return 404, {"error": f"LeetCode user {user} not found."}
+
+    solved = {s["difficulty"].lower(): s["count"] for s in found["submitStatsGlobal"]["acSubmissionNum"]}
+    # The calendar maps each day (unix seconds, UTC midnight) to that day's submission count.
+    try:
+        days = [int(t) for t in json.loads(found["userCalendar"]["submissionCalendar"] or "{}")]
+    except (TypeError, ValueError):
+        days = []
+    now = time.time()
+    contest = data.get("userContestRanking") or {}
+    avatar = found["profile"].get("userAvatar") or ""
+    return 200, {
+        "user": found["username"], "profileUrl": f"https://leetcode.com/u/{found['username']}/",
+        "name": found["profile"].get("realName") or "",
+        "photo": "" if "default_avatar" in avatar else avatar,  # the stock avatar isn't the user's photo
+        "solved": {k: solved.get(k, 0) for k in ("all", "easy", "medium", "hard")},
+        "activeDays90": sum(1 for t in days if now - t <= 90 * 86400),
+        "lastActiveDays": int((now - max(days)) // 86400) if days else None,
+        "contestRating": round(contest["rating"]) if contest.get("attendedContestsCount") else None,
+        "contests": contest.get("attendedContestsCount") or 0,
+    }
+
+
 PHOTO_HOSTS = (  # where platforms serve profile photos; nothing else is fetched
     "githubusercontent.com", "gravatar.com", "stack.imgur.com", "sstatic.net", "googleusercontent.com",
-    "medium.com", "dev.to", "dev-to-uploads.s3.amazonaws.com", "licdn.com",
+    "medium.com", "dev.to", "dev-to-uploads.s3.amazonaws.com", "licdn.com", "leetcode.com",
 )
 _photo_hashes: dict[str, str] = {}
 MAX_CACHED_PHOTOS = 5000
@@ -365,9 +432,11 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "V-Z-ble"
     sys_version = ""
 
-    def _send(self, status: int, body: bytes, content_type: str):
+    def _send(self, status: int, body: bytes, content_type: str, headers: dict | None = None):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -389,9 +458,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         route = urlparse(self.path)
         query = parse_qs(route.query)
-        feeds = {"/api/medium": fetch_medium, "/api/substack": fetch_substack}
+        feeds = {"/api/medium": fetch_medium, "/api/substack": fetch_substack, "/api/leetcode": fetch_leetcode}
         if route.path in ("/", "/index.html"):
             return self._send(200, (ROOT / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if route.path == EXTENSION_ZIP_PATH:
+            return self._send(200, extension_zip(), "application/zip",
+                              {"Content-Disposition": f'attachment; filename="{EXTENSION_ZIP_PATH[1:]}"'})
         if route.path == "/health":  # Cloud Run reserves /healthz
             return self._send(200, b"ok", "text/plain")
         if route.path == "/api/status":
@@ -406,7 +478,7 @@ class Handler(BaseHTTPRequestHandler):
         if route.path == "/api/linkedin":
             user = self._user()
             return self._json(*load_linkedin(user)) if user else self._json(400, {"error": "Missing visitor ID."})
-        # Nothing else is served: not the server's code, imports, queued reviews or the extension.
+        # Nothing else is served: not the server's code, imports or queued reviews.
         return self._json(404, {"error": "Not found."})
 
     def do_POST(self):

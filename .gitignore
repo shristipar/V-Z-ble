@@ -5,3 +5,6 @@ reviews/
 data/
 *.pyc
 .DS_Store
+dist/
+keys/
+*.pem

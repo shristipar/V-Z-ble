@@ -11,7 +11,58 @@ const SECTION_HEADINGS = [
 // The profile column ends where LinkedIn's right-hand sidebar starts.
 const SIDEBAR_START = /^(Profile language|Public profile & URL|Who your viewers also viewed|People also viewed|People you may know|More profiles for you|You might like)$/;
 // Buttons and prompts that aren't profile content.
-const UI_NOISE = /^(Show all.*|Show (more|less|details)|…\s*see more|see more|Create a post|Add (section|services|profile section)|Edit.*|Private to you|Get started|Resources|Contact info|Endorse|Message|Connect|Follow|·)$/i;
+const UI_NOISE = /^(Show all.*|Show (more|less|details)|(…|\.\.\.)\s*(see )?(more|less)|see (more|less)|(LinkedIn )?helped me get this job|Create a post|Add (section|services|profile section)|Edit.*|Private to you|Get started|Resources|Contact info|Endorse|Message|Connect|Follow|·)$/i;
+
+// The controls that reveal cut-off text ("… more", "…see more"). The ellipsis or "see" matters:
+// a bare "More" is the top card's actions menu.
+const MORE_TEXT = /^(…|\.\.\.)\s*(see )?more$|^see more$/i;
+const EXPANDED_SECTIONS = ["About", "Experience", "Education"];
+
+// The cut-off controls under the sections we keep. Posts in Activity stay collapsed, since their
+// text isn't used and could skew the post dates. LinkedIn's markup changes often, so this goes by
+// text: the deepest element reading "… more", and which section heading comes before it.
+function truncatedTextControls(doc) {
+  const text = el => (el.textContent || "").replace(/\s+/g, " ").trim();
+  const isHeading = t => SECTION_HEADINGS.includes(t.replace(/\s*\(\d[\d,]*\)$/, "")) || SIDEBAR_START.test(t);
+  const marks = [];
+  const seen = new Set();
+  for (const el of doc.querySelectorAll("h1, h2, h3, h4, button, a, p, span, div, [role=button]")) {
+    const t = text(el);
+    if (t.length > 60) continue;
+    const child = [...el.children].some(c => text(c) === t);  // the deepest element speaks for it
+    if (child) continue;
+    if (isHeading(t)) marks.push({ el, heading: t.replace(/\s*\(\d[\d,]*\)$/, "") });
+    else if (MORE_TEXT.test(t)) {
+      const control = el.closest("button, [role=button], a") || el;
+      // A real link would leave the page.
+      if (control.tagName === "A" && !/^(#.*)?$/.test(control.getAttribute("href") || "")) continue;
+      if (seen.has(control)) continue;
+      seen.add(control);
+      marks.push({ el: control, control: true });
+    }
+  }
+  marks.sort((a, b) => a.el === b.el ? 0 : a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+  let section = "";
+  const controls = [];
+  for (const m of marks) {
+    if (m.heading) section = m.heading;
+    else if (EXPANDED_SECTIONS.includes(section)) controls.push(m.el);
+  }
+  return controls;
+}
+
+// Clicks each "… more" so the full text is on the page. Returns how many are still cut off.
+async function expandTruncatedText(doc = document) {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const clicked = new Set();
+  for (let pass = 0; pass < 4; pass++) {
+    const fresh = truncatedTextControls(doc).filter(c => !clicked.has(c));
+    if (!fresh.length) break;
+    for (const control of fresh) { clicked.add(control); control.click(); await sleep(100); }
+    await sleep(400);  // let LinkedIn redraw before looking again
+  }
+  return truncatedTextControls(doc).length;
+}
 
 function profileLines(doc) {
   const root = doc.querySelector("main") || doc.body;

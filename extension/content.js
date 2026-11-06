@@ -43,7 +43,9 @@
     btn.disabled = true;
     label("Reading profile…");
     await loadAllSections();
+    const cutOffCount = await expandTruncatedText();
     const profile = extractLinkedInProfile();
+    profile.cutOffCount = cutOffCount;
     // Lets the app spot an outdated extension (Chrome keeps old code until you reload it).
     profile.extensionVersion = chrome.runtime.getManifest().version;
     if (!profile.looksLikeOwnProfile && !confirmOther) {

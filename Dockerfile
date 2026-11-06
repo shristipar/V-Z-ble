@@ -7,9 +7,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Only what the server needs: the page, the server, and the extension's manifest (for its version).
+# Only what the server needs: the page, the server, and the extension (offered as a download).
 COPY server.py index.html ./
-COPY extension/manifest.json extension/manifest.json
+COPY extension/ extension/
 
 RUN useradd --create-home app
 USER app
